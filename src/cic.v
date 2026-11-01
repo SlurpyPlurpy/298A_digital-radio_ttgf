@@ -25,6 +25,7 @@ module cic #(
 );
 
     localparam COUNT_WIDTH = (DECIMATION <= 2) ? 1 : $clog2(DECIMATION);
+    localparam [COUNT_WIDTH-1:0] LAST_COUNT = COUNT_WIDTH'(DECIMATION - 1);
 
     reg signed [OUTPUT_WIDTH-1:0] integrator [0:STAGES-1];
     reg signed [OUTPUT_WIDTH-1:0] comb_delay [0:STAGES-1];
@@ -33,7 +34,8 @@ module cic #(
     wire signed [OUTPUT_WIDTH-1:0] integrator_input;
     wire signed [OUTPUT_WIDTH-1:0] comb_stage [0:STAGES];
 
-    integer i;
+    integer integrator_index;
+    integer comb_index;
     genvar k;
 
     // Sign-extend the input into the internal accumulator width.
@@ -53,15 +55,15 @@ module cic #(
     // Integrator chain: one update per valid input sample.
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            for (i = 0; i < STAGES; i = i + 1)
-                integrator[i] <= {OUTPUT_WIDTH{1'b0}};
+            for (integrator_index = 0; integrator_index < STAGES; integrator_index = integrator_index + 1)
+                integrator[integrator_index] <= {OUTPUT_WIDTH{1'b0}};
             decim_count <= {COUNT_WIDTH{1'b0}};
         end else if (data_valid) begin
             integrator[0] <= integrator[0] + integrator_input;
-            for (i = 1; i < STAGES; i = i + 1)
-                integrator[i] <= integrator[i] + integrator[i-1];
+            for (integrator_index = 1; integrator_index < STAGES; integrator_index = integrator_index + 1)
+                integrator[integrator_index] <= integrator[integrator_index] + integrator[integrator_index-1];
 
-            if (decim_count == DECIMATION-1)
+            if (decim_count == LAST_COUNT)
                 decim_count <= {COUNT_WIDTH{1'b0}};
             else
                 decim_count <= decim_count + 1'b1;
@@ -72,15 +74,15 @@ module cic #(
     // data_out is registered at that same event.
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            for (i = 0; i < STAGES; i = i + 1)
-                comb_delay[i] <= {OUTPUT_WIDTH{1'b0}};
+            for (comb_index = 0; comb_index < STAGES; comb_index = comb_index + 1)
+                comb_delay[comb_index] <= {OUTPUT_WIDTH{1'b0}};
             data_out     <= {OUTPUT_WIDTH{1'b0}};
             sample_valid <= 1'b0;
         end else begin
             sample_valid <= 1'b0;
-            if (data_valid && decim_count == DECIMATION-1) begin
-                for (i = 0; i < STAGES; i = i + 1)
-                    comb_delay[i] <= comb_stage[i];
+            if (data_valid && decim_count == LAST_COUNT) begin
+                for (comb_index = 0; comb_index < STAGES; comb_index = comb_index + 1)
+                    comb_delay[comb_index] <= comb_stage[comb_index];
                 data_out     <= comb_stage[STAGES];
                 sample_valid <= 1'b1;
             end

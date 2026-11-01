@@ -67,8 +67,8 @@ module tt_um_angela_ethan_digitalradio (
     assign uio_out = 8'b0;
     assign uio_oe = 8'b0;
 
-    // ena is unused per the existing Tiny Tapeout interface convention.
-    wire _unused = &{ena, uio_in, 1'b0};
+    // Unused interface inputs and intentionally discarded audio precision.
+    wire _unused = &{ena, uio_in, baseband_sample[CIC_WIDTH-AUDIO_WIDTH-1:0], 1'b0};
 
 endmodule
 
