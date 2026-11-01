@@ -1,12 +1,13 @@
 # Makefile
 # See https://docs.cocotb.org/en/stable/quickstart.html for more info
+# The above link seems to be broken... try this? https://docs.cocotb.org/en/v1.1/quickstart.html
 
 # defaults
 SIM ?= icarus
 FST ?= -fst # Use more efficient FST format
 TOPLEVEL_LANG ?= verilog
 SRC_DIR = $(PWD)/../src
-PROJECT_SOURCES = project.v
+PROJECT_SOURCES = project.v nco.v mixer.v cic.v pwm.v
 
 ifneq ($(GATES),yes)
 
