@@ -1,11 +1,11 @@
 # Tiny Tapeout project information
 project:
-  title:        "Digital Radio"      # Project title
+  title:        "Digital Radio Backend"      # Project title
   author:       "Angela and Ethan"      # Your name
   discord:      ""      # Your discord username, for communication and automatically assigning you a Tapeout role (optional)
-  description:  "1-bit digital AM radio receiver"      # One line description of what your project does
+  description:  ""
   language:     "Verilog" # other examples include SystemVerilog, Amaranth, VHDL, etc
-  clock_hz:     50000000       # Clock frequency in Hz (or 0 if not applicable)
+  clock_hz:     1000000       # Clock frequency in Hz (or 0 if not applicable)
 
   # How many tiles your design occupies? A single tile is about 340x160 uM.
   tiles: "1x1"          # Valid values: 1x1, 1x2, 2x2, 3x2, 4x2, 3x4 or 4x4
@@ -18,27 +18,24 @@ project:
   # Don't forget to also update `PROJECT_SOURCES` in test/Makefile.
   source_files:
     - "project.v"
-    - "nco.v"
-    - "mixer.v"
-    - "cic.v"
-    - "pwm.v"
+    - "fir_filter.v"
 
 # The pinout of your project. Leave unused pins blank. DO NOT delete or add any pins.
 # This section is for the datasheet/website. Use descriptive names (e.g., RX, TX, MOSI, SCL, SEG_A, etc.).
 pinout:
   # Inputs
-  ui[0]: "rf_in"
-  ui[1]: "freq_ctrl_0"
-  ui[2]: "freq_ctrl_1"
-  ui[3]: "freq_ctrl_2"
-  ui[4]: "freq_ctrl_3"
-  ui[5]: "freq_ctrl_4"
-  ui[6]: "freq_ctrl_5"
-  ui[7]: "freq_ctrl_6"
+  ui[0]: "if_sample_0"
+  ui[1]: "if_sample_1"
+  ui[2]: "if_sample_2"
+  ui[3]: "if_sample_3"
+  ui[4]: "if_sample_4"
+  ui[5]: "if_sample_5"
+  ui[6]: "if_sample_6"
+  ui[7]: "if_sample_7"
 
   # Outputs
   uo[0]: "pwm_out"
-  uo[1]: "nco_debug"
+  uo[1]: ""
   uo[2]: ""
   uo[3]: ""
   uo[4]: ""
