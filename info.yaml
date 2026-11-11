@@ -19,6 +19,10 @@ project:
   source_files:
     - "project.v"
     - "fir_filter.v"
+    - "nco_sine_gen.v"
+    - "dc_removal.v"
+    - "scaling_limiter.v"
+    - "pwm_modulator_1mhz.v"
 
 # The pinout of your project. Leave unused pins blank. DO NOT delete or add any pins.
 # This section is for the datasheet/website. Use descriptive names (e.g., RX, TX, MOSI, SCL, SEG_A, etc.).
