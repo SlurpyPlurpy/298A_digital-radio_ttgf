@@ -24,8 +24,6 @@ module tt_um_angela_ethan_digitalradio (
     wire signed [7:0] sine_reference; // 8-bit local oscillator output of reference wave
     wire signed [13:0] dc_removed_audio;
     wire signed [9:0] limited_audio;
-    reg [7:0] pwm_counter;
-    reg       pwm_out_reg;
 
 
     // NCO
