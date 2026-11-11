@@ -8,7 +8,7 @@ module dc_removal (
   output wire signed [13:0] audio_out    // signed audio output after DC is removed
 );
 
-    reg signed [23:0] avg_reg;
+    reg signed [24:0] avg_reg;
   
     // Scale the incoming 14-bit sample to match the 11-bit fractional fixed-point scale (multiply by 2048)
     wire signed [24:0] scaled_sample = {sample_in, 11'b0};
