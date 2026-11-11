@@ -97,27 +97,20 @@ module tt_um_angela_ethan_digitalradio (
  
     reg [7:0] uo_mux;
     
-    always @(*) begin
-        uo_mux = 8'h00; // Safe default prevents floating Z states
-        case (uio_in[7:4])
-            4'h2: uo_mux = sine_reference;                 // NCO test page
-            4'h3: uo_mux = uio_in[0] ? mixer_sample[15:8]  // Multiplier High Byte
-                                     : mixer_sample[7:0];  // Multiplier Low Byte
-            4'h4: uo_mux = uio_in[4] ? {{2{fir_sum[13]}}, fir_sum[13:8]} 
-                                     : fir_sum[7:0];       // FIR test pages
-            4'h5: uo_mux = dc_removed_audio[7:0];          // DC Removal test page
-            4'h6: uo_mux = limited_audio[7:0];             // Limiter test page
-            4'h8: uo_mux = {7'b0, pwm_out};                // PWM output on bit 0, 0s on [7:1]
-            default: uo_mux = 8'h00;
-        end case
-    end
+    wire [7:0] fir_high_byte = { {2{fir_sum[13]}}, fir_sum[13:8] };
 
-    assign uo_out = uo_mux;
+    assign uo_out = (uio_in[7:4] == 4'h2) ? sine_reference :
+                    (uio_in[7:4] == 4'h3) ? (uio_in[0] ? mixer_sample[15:8] : mixer_sample[7:0]) :
+                    (uio_in[7:4] == 4'h4) ? (uio_in[4] ? fir_high_byte : fir_sum[7:0]) :
+                    (uio_in[7:4] == 4'h5) ? dc_removed_audio[7:0] :
+                    (uio_in[7:4] == 4'h6) ? limited_audio[7:0] :
+                    (uio_in[7:4] == 4'h8) ? {7'b0, uo_out[0]} : 
+                    8'h00;
+
     assign uio_out = 8'b0;
-    assign uio_oe = 8'b0;  // All bidirectional pins operate as inputs.
+    assign uio_oe  = 8'b0;  
 
-    // TODO: Remove uio_in[7:5] here once the multiplier uses all reference bits.
-    wire _unused = &{ena, uio_in, 1'b0};
+    wire _unused = &{ena, uio_in[3:1], uio_in[7:5], 1'b0};
 endmodule
 
 `default_nettype wire
