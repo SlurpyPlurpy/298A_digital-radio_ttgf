@@ -40,7 +40,7 @@ VERILOG_SOURCES += $(PWD)/tb.v
 TOPLEVEL = tb
 
 # List test modules to run, separated by commas and without the .py suffix:
-COCOTB_TEST_MODULES = test_nco
+COCOTB_TEST_MODULES = test_nco,test_multiplier,test_fir,test_dc_removal,test_scaling_limiter,test_pwm_modulator
 
 # include cocotb's make rules to take care of the simulator setup
 include $(shell cocotb-config --makefiles)/Makefile.sim
