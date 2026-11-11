@@ -24,10 +24,10 @@ module tt_um_angela_ethan_digitalradio (
     wire signed [7:0] sine_reference; // 8-bit local oscillator output of reference wave
     wire signed [13:0] dc_removed_audio;
     wire signed [9:0] limited_audio;
-
+    wire              pwm_out;
 
     // NCO
-    wire [7:0] tuning_word = 8'd64;
+    wire [7:0] tuning_word = ui_in;
 
     nco_sine_gen u_nco (
         .clk(clk),
@@ -94,8 +94,7 @@ module tt_um_angela_ethan_digitalradio (
         .pwm_out(uo_out[0])
     );
     
- 
-    reg [7:0] uo_mux;
+
     
     wire [7:0] fir_high_byte = { {2{fir_sum[13]}}, fir_sum[13:8] };
 
