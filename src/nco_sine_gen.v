@@ -21,6 +21,8 @@ module nco_sine_gen (
     // Use the top 6 bits of the accumulator as the 64-entry ROM address (0 to 63)
     wire [5:0] lut_addr = phase_acc[7:2];
 
+    reg signed [7:0] sine_wave_rom;
+    
   // Complete 64-entry Sine ROM (for now, can update if needed and there is space)
     always @(*) begin
         case (lut_addr)
