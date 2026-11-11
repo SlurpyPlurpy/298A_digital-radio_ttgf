@@ -66,8 +66,6 @@ module tt_um_angela_ethan_digitalradio (
     // For now uio_in[4] selects low byte (0) or sign-extended high byte (1).
     // Read both pages between sample edges; there is no snapshot register.
     // Keeping both pages observable prevents removal of unused FIR bits.
-    assign uo_out = uio_in[4] ? {{2{fir_sum[13]}}, fir_sum[13:8]}
-                                : fir_sum[7:0];
     // END TEMPORARY OUTPUT ADAPTER
 
     // DC removal
@@ -97,7 +95,24 @@ module tt_um_angela_ethan_digitalradio (
     );
     
  
-    assign uo_out[7:1] = 7'b0;
+    reg [7:0] uo_mux;
+    
+    always @(*) begin
+        uo_mux = 8'h00; // Safe default prevents floating Z states
+        case (uio_in[7:4])
+            4'h2: uo_mux = sine_reference;                 // NCO test page
+            4'h3: uo_mux = uio_in[0] ? mixer_sample[15:8]  // Multiplier High Byte
+                                     : mixer_sample[7:0];  // Multiplier Low Byte
+            4'h4: uo_mux = uio_in[4] ? {{2{fir_sum[13]}}, fir_sum[13:8]} 
+                                     : fir_sum[7:0];       // FIR test pages
+            4'h5: uo_mux = dc_removed_audio[7:0];          // DC Removal test page
+            4'h6: uo_mux = limited_audio[7:0];             // Limiter test page
+            4'h8: uo_mux = {7'b0, pwm_out};                // PWM output on bit 0, 0s on [7:1]
+            default: uo_mux = 8'h00;
+        end case
+    end
+
+    assign uo_out = uo_mux;
     assign uio_out = 8'b0;
     assign uio_oe = 8'b0;  // All bidirectional pins operate as inputs.
 
