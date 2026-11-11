@@ -22,58 +22,21 @@ module tt_um_angela_ethan_digitalradio (
     wire signed [15:0] mixer_sample; // Full signed 8x8 multiplier product.
     wire signed [13:0] fir_sum;      // Raw FIR result for audio scaling/PWM.
     wire signed [7:0] sine_reference; // 8-bit local oscillator output of reference wave
-
+    wire signed [13:0] dc_removed_audio;
+    wire signed [9:0] limited_audio;
     reg [7:0] pwm_counter;
     reg       pwm_out_reg;
 
 
-    // Reference sine wave lookup table
-    reg [5:0] lut_addr;
-    // increments table address pointer at every clock edge
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            lut_addr <= 6'd0;                                // reset back to zero on rst_n
-        end else begin
-            lut_adr <= lut_addr + 6'd1;                      // step to the next entry on clock edge
-        end 
-    end
+    // NCO
+    wire [7:0] tuning_word = 8'd64;
 
-    always @(*) begin
-        case (lut_addr)
-            6'd0:  sine_wave = 8'sd0;      // 0 degrees phase point
-            6'd1:  sine_wave = 8'sd25;     
-            6'd2:  sine_wave = 8'sd50;
-            6'd3:  sine_wave = 8'sd74;
-            6'd4:  sine_wave = 8'sd95;
-            6'd5:  sine_wave = 8'sd112;
-            6'd6:  sine_wave = 8'sd124;
-            6'd7:  sine_wave = 8'sd127;    // Positive peak amplitude (~90 degrees)
-            6'd8:  sine_wave = 8'sd124;
-            6'd9:  sine_wave = 8'sd112;
-            6'd10: sine_wave = 8'sd95;
-            6'd11: sine_wave = 8'sd74;
-            6'd12: sine_wave = 8'sd50;
-            6'd13: sine_wave = 8'sd25;
-            6'd14: sine_wave = 8'sd0;      // Zero crossing point (~180 degrees)
-            6'd15: sine_wave = -8'sd25;    
-            6'd16: sine_wave = -8'sd50;
-            6'd17: sine_wave = -8'sd74;
-            6'd18: sine_wave = -8'sd95;
-            6'd19: sine_wave = -8'sd112;
-            6'd20: sine_wave = -8'sd124;
-            6'd21: sine_wave = -8'sd127;   // Negative peak amplitude (~270 degrees)
-            6'd22: sine_wave = -8'sd124;
-            6'd23: sine_wave = -8'sd112;
-            6'd24: sine_wave = -8'sd95;
-            6'd25: sine_wave = -8'sd74;
-            6'd26: sine_wave = -8'sd50;
-            6'd27: sine_wave = -8'sd25;
-            default: sine_wave = 8'sd0;    // Fallback safe value for any unlisted table addresses
-        endcase
-    end
-
-    reg signed [7:0] sine_wave;
-    assign sine_reference = sign+wave;
+    nco_sine_gen u_nco (
+        .clk(clk),
+        .rst_n(rst_n),
+        .tuning_word(tuning_word),
+        .sine_reference(sine_reference)
+    );
     
     // BEGIN TEMPORARY INPUT ADAPTER
     // TODO: Remove this assignment when the multiplier drives mixer_sample.
