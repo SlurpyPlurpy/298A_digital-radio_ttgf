@@ -5,15 +5,9 @@
 
 `default_nettype none
 
-// Temporary FIR-only wrapper for area estimation and pin-level testing.
-// Supply q = floor(mixer_product / 16), a signed 12-bit value, on:
-//   ui_in[7:0]  = q[7:0]   (original mixer product bits [11:4])
-//   uio_in[3:0] = q[11:8]  (original mixer product bits [15:12])
-// Supported q range: -1016 through +1024, including both mixer endpoints.
-// The omitted product bits [3:0] are discarded by the FIR anyway.
-// uio_in[4] selects the output byte: 0 = bits [7:0], 1 = bits [13:8]
-// sign-extended to eight bits. Read both pages between sample edges;
-// there is no output snapshot register. uio_in[7:5] are unused.
+// Radio backend integration: multiplier -> mixer_sample -> FIR -> fir_sum
+// -> audio scaling/PWM -> uo_out[0].
+// TEMPORARY pin adapters below keep the FIR observable for area estimation.
 module tt_um_angela_ethan_digitalradio (
     input  wire [7:0] ui_in,
     output wire [7:0] uo_out,
@@ -24,12 +18,18 @@ module tt_um_angela_ethan_digitalradio (
     input  wire       clk,
     input  wire       rst_n
 );
-    wire signed [15:0] mixer_sample;
-    wire signed [13:0] fir_sum;
+    // Permanent internal connection points; keep these when integrating.
+    wire signed [15:0] mixer_sample; // Full signed 8x8 multiplier product.
+    wire signed [13:0] fir_sum;      // Raw FIR result for audio scaling/PWM.
 
-    // Restore the bit positions expected by the unchanged FIR interface.
-    // Its initial >>> 4 recovers q exactly, including negative values.
+    // BEGIN TEMPORARY INPUT ADAPTER
+    // TODO: Remove this assignment when the multiplier drives mixer_sample.
+    // Feed the final multiplier from ui_in (IF) and uio_in (local reference).
+    // For now supply q=floor(product/16), range -1016..+1024:
+    // ui_in=q[7:0], uio_in[3:0]=q[11:8]. Restore four discarded low bits
+    // as zeros; the FIR's initial >>> 4 recovers q exactly.
     assign mixer_sample = {uio_in[3:0], ui_in, 4'b0000};
+    // END TEMPORARY INPUT ADAPTER
 
     fir_filter u_fir (
         .clk(clk),
@@ -39,12 +39,20 @@ module tt_um_angela_ethan_digitalradio (
         .fir_sum(fir_sum)
     );
 
-    // Both pages are externally observable so all FIR output bits are used.
+    // BEGIN TEMPORARY OUTPUT ADAPTER
+    // TODO: Remove this assignment when fir_sum feeds audio scaling/PWM.
+    // Connect that module's PWM output to uo_out[0], zero unused output pins,
+    // and update the project-level test. No FIR instance changes are needed.
+    // For now uio_in[4] selects low byte (0) or sign-extended high byte (1).
+    // Read both pages between sample edges; there is no snapshot register.
+    // Keeping both pages observable prevents removal of unused FIR bits.
     assign uo_out = uio_in[4] ? {{2{fir_sum[13]}}, fir_sum[13:8]}
                                 : fir_sum[7:0];
+    // END TEMPORARY OUTPUT ADAPTER
     assign uio_out = 8'b0;
     assign uio_oe = 8'b0;  // All bidirectional pins operate as inputs.
 
+    // TODO: Remove uio_in[7:5] here once the multiplier uses all reference bits.
     wire _unused = &{ena, uio_in[7:5], 1'b0};
 endmodule
 
