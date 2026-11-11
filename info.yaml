@@ -1,9 +1,9 @@
 # Tiny Tapeout project information
 project:
-  title:        "Digital Radio Backend"      # Project title
+  title:        "Digital AM Radio Backend"      # Project title
   author:       "Angela and Ethan"      # Your name
   discord:      ""      # Your discord username, for communication and automatically assigning you a Tapeout role (optional)
-  description:  ""
+  description:  "This project implements a multiplier and a FIR low-pass filter to extract the message from an input AM signal."
   language:     "Verilog" # other examples include SystemVerilog, Amaranth, VHDL, etc
   clock_hz:     1000000       # Clock frequency in Hz (or 0 if not applicable)
 
