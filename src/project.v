@@ -82,7 +82,7 @@ module tt_um_angela_ethan_digitalradio (
 
     // Scaling and Limiting
 
-    sacling_limiter u_limiter (
+    scaling_limiter u_limiter (
         .audio_in(dc_removed_audio),
         .audio_out(limited_audio)
     );
@@ -92,7 +92,7 @@ module tt_um_angela_ethan_digitalradio (
     pwm_modulator_1mhz u_pwm (
         .clk(clk),
         .rst_n(rst_n),
-        audio_in(limited_audio),
+        .audio_in(limited_audio),
         .pwm_out(uo_out[0])
     );
     
