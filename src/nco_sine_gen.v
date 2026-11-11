@@ -93,8 +93,7 @@ module nco_sine_gen (
             default: sine_wave_rom = 8'sd0;
         endcase
     end
-
-    reg signed [7:0] sine_wave_rom;
+    
     always @(*) begin
         sine_reference = sine_wave_rom;
     end
