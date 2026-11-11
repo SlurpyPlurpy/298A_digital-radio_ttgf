@@ -91,7 +91,7 @@ module tt_um_angela_ethan_digitalradio (
         .clk(clk),
         .rst_n(rst_n),
         .audio_in(limited_audio),
-        .pwm_out(uo_out[0])
+        .pwm_out(pwm_out)
     );
     
 
@@ -104,7 +104,7 @@ module tt_um_angela_ethan_digitalradio (
                     (uio_in[7:4] == 4'h4) ? (uio_in[4] ? fir_high_byte : fir_sum[7:0]) :
                     (uio_in[7:4] == 4'h5) ? dc_removed_audio[7:0] :
                     (uio_in[7:4] == 4'h6) ? limited_audio[7:0] :
-                    (uio_in[7:4] == 4'h8) ? {7'b0, uo_out[0]} : 
+                    (uio_in[7:4] == 4'h8) ? {7'b0, pwm_out} : 
                     8'h00;
 
     assign uio_out = 8'b0;
