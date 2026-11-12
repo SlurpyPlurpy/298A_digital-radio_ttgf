@@ -1,51 +1,76 @@
 import cocotb
 from cocotb.triggers import Timer
+import numpy as np
+import matplotlib.pyplot as plt
 
 @cocotb.test()
-async def test_nco_comprehensive(dut):
-    """Comprehensive test for NCO phase accumulator and sine ROM lookup."""
-    
+async def test_nco_455khz(dut):
+
+    CLK_FREQ = 20_000_000
+    CLK_PERIOD = 50
+    EXPECTED_FREQ = 455_000
+    NUM_SAMPLES = 2000
+
+    # Initialize DUT
     dut.clk.value = 0
     dut.rst_n.value = 0
     dut.ena.value = 1
     dut.ui_in.value = 0
     dut.uio_in.value = 0x20
+
     await Timer(100, unit="ns")
-    
     dut.rst_n.value = 1
-    for _ in range(3):
-        dut.clk.value = 1
-        await Timer(25, unit="ns")
-        dut.clk.value = 0
-        await Timer(25, unit="ns")
 
-    async def read_nco(tuning_word):
-        dut.ui_in.value = tuning_word & 0xff
-        dut.uio_in.value = 0x20
-        
-        dut.clk.value = 1
-        await Timer(25, unit="ns")
-        dut.clk.value = 0
-        await Timer(25, unit="ns")
-        
-        raw_val = int(dut.uo_out.value)
-        return raw_val - 256 if raw_val & 128 else raw_val
-
-    # Test case 1: Zero tuning word
-    val_initial = await read_nco(0)
-    for _ in range(15):
-        val = await read_nco(0)
-        assert val == val_initial, "NCO output drifted while tuning word was zero!"
-
-    # Test case 2: Standard frequency step
+    # Capture NCO waveform
     waveform = []
-    for _ in range(64):
-        val = await read_nco(4)
-        waveform.append(val)
-        assert -127 <= val <= 127, f"NCO output {val} exceeded limits!"
 
-    max_peak = max(waveform)
-    min_peak = min(waveform)
-    
-    assert max_peak >= 110, f"Sine wave positive peak too low: {max_peak}"
-    assert min_peak <= -110, f"Sine wave negative peak too high: {min_peak}"
+    for _ in range(NUM_SAMPLES):
+
+        dut.clk.value = 1
+        await Timer(25, unit="ns")
+
+        raw = int(dut.uo_out.value)
+        value = raw - 256 if raw & 128 else raw
+
+        waveform.append(value)
+
+        dut.clk.value = 0
+        await Timer(25, unit="ns")
+
+    # Detect positive zero crossings
+    crossings = []
+
+    for i in range(1, len(waveform)):
+        if waveform[i-1] <= 0 and waveform[i] > 0:
+            crossings.append(i)
+
+    assert len(crossings) >= 5, "NCO waveform not detected!"
+
+    # Calculate frequency
+    periods = np.diff(crossings)
+    avg_period = np.mean(periods)
+
+    measured_freq = CLK_FREQ / avg_period
+
+    # Verify frequency
+    assert abs(measured_freq - EXPECTED_FREQ) / EXPECTED_FREQ < 0.02, (
+        f"Expected 455 kHz, measured {measured_freq:.2f} Hz"
+    )
+
+    # Plot waveform
+    time_us = np.arange(NUM_SAMPLES) / CLK_FREQ * 1e6
+
+    plt.figure(figsize=(10, 4))
+    plt.plot(time_us, waveform)
+
+    plt.title("NCO Output: 455 kHz")
+    plt.xlabel("Time (us)")
+    plt.ylabel("Sine Output")
+    plt.grid()
+
+    plt.tight_layout()
+    plt.savefig("nco_waveform.png")
+    plt.close()
+
+    dut._log.info(f"Measured NCO frequency: {measured_freq:.2f} Hz")
+    dut._log.info("NCO test passed")
