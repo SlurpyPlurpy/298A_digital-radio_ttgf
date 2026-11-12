@@ -98,8 +98,8 @@ module tt_um_angela_ethan_digitalradio (
     
     wire [7:0] fir_high_byte = { {2{fir_sum[13]}}, fir_sum[13:8] };
 
-    assign uo_out = (^uio_in[7:4] === 1'bx) ? 8'h00 :
-                    (uio_in[7:4] == 4'h2) ? sine_reference :
+    // Decode hardware modes directly; X detection belongs in the testbench.
+    assign uo_out = (uio_in[7:4] == 4'h2) ? sine_reference :
                     (uio_in[7:4] == 4'h3) ? (uio_in[0] ? mixer_sample[15:8] : mixer_sample[7:0]) :
                     (uio_in[7:4] == 4'h4) ? (uio_in[4] ? fir_high_byte : fir_sum[7:0]) :
                     (uio_in[7:4] == 4'h5) ? dc_removed_audio[7:0] :
