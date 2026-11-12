@@ -5,7 +5,7 @@ module dc_removal (
     input  wire               rst_n,
     input  wire               sample_en,
     input  wire signed [13:0] sample_in,   // 14-bit signed FIR filter output
-  output wire signed [13:0] audio_out    // signed audio output after DC is removed
+    output wire signed [13:0] audio_out    // signed audio output after DC is removed
 );
 
     reg signed [24:0] avg_reg;
@@ -19,8 +19,8 @@ module dc_removal (
     // Update average
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            // Startup policy: Initialize average to the first incoming sample scaled up
-            avg_reg <= {sample_in, 11'b0};
+            // Reset the average to a constant zero for hardware synthesis.
+            avg_reg <= 25'sd0;
         end else if (sample_en) begin
             avg_reg <= avg_reg + (error >>> 9); // shift right by 9 bits (1/512) towards the sampel
         end
