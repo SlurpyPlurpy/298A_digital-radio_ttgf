@@ -3,17 +3,18 @@
 module nco_sine_gen (
     input  wire               clk,
     input  wire               rst_n,
-    input  wire [23:0]         tuning_word,  // no frequency control, only need the 455kHz to match assumed incoming signal frequency
     output reg signed [7:0]   sine_reference
 );
 
+    // round(455000 * 2^24 / 1000000): 454999.983 Hz at a 1 MHz clock.
+    localparam [23:0] PHASE_STEP = 24'd7633633;
     reg [23:0] phase_acc;
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             phase_acc <= 24'd0;
         end else begin
-            phase_acc <= phase_acc + tuning_word;
+            phase_acc <= phase_acc + PHASE_STEP;
         end
     end
 
