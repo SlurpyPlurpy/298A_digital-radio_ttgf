@@ -49,6 +49,9 @@ module pwm_modulator_1mhz (
         end
     end
 
+    // PWM intentionally uses only the upper five audio bits.
+    wire _unused = &{audio_in[4:0], 1'b0};
+
 endmodule
 
 `default_nettype wire

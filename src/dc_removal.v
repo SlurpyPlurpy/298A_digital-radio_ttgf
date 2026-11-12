@@ -30,6 +30,9 @@ module dc_removal (
     wire signed [24:0] dc_removed = scaled_sample - avg_reg;
     assign audio_out = dc_removed[24:11]; // Extract whole-number signed audio bits
 
+    // The fractional output bits are intentionally discarded.
+    wire _unused = &{dc_removed[10:0], 1'b0};
+
 endmodule
 
 `default_nettype wire
