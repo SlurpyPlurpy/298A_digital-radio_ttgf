@@ -23,6 +23,9 @@ jobs:
         shell: bash
         run: pip install -r test/requirements.txt
 
+      - name: Install dependencies
+        run: pip install numpy matplotlib
+
       - name: Run tests
         run: |
           cd test
