@@ -5,9 +5,8 @@
 
 `default_nettype none
 
-// Radio backend integration: multiplier -> mixer_sample -> FIR -> fir_sum
-// -> audio scaling/PWM -> uo_out[0].
-// TEMPORARY pin adapters below keep the FIR observable for area estimation.
+// Signed 8-bit IF samples at 1 MHz; the input carrier is phase-aligned
+// with the fixed 455 kHz NCO. Mixer -> FIR -> DC removal -> limiter -> PWM.
 module tt_um_angela_ethan_digitalradio (
     input  wire [7:0] ui_in,
     output wire [7:0] uo_out,
@@ -18,7 +17,6 @@ module tt_um_angela_ethan_digitalradio (
     input  wire       clk,
     input  wire       rst_n
 );
-    // Permanent internal connection points; keep these when integrating.
     wire signed [15:0] mixer_sample; // Full signed 8x8 multiplier product.
     wire signed [13:0] fir_sum;      // Raw FIR result for audio scaling/PWM.
     wire signed [7:0] sine_reference; // 8-bit local oscillator output of reference wave
@@ -27,29 +25,17 @@ module tt_um_angela_ethan_digitalradio (
     wire signed [7:0] if_sample = $signed(ui_in);
     wire              pwm_out;
 
-
-    // NCO
-    wire [23:0] tuning_word = 24'd7633633;  // no longer having an input to select the channel since we are assuming a clean 455kHz incoming signal
-                                            // tuning word = 455000 * 2^24 / 1000000 = 7633633 approx
+    // Fixed-frequency reference, independent of the ADC sample bus.
     nco_sine_gen u_nco (
         .clk(clk),
         .rst_n(rst_n),
-        .tuning_word(tuning_word),
         .sine_reference(sine_reference)
     );
     
-    // BEGIN TEMPORARY INPUT ADAPTER
-    // TODO: Remove this assignment when the multiplier drives mixer_sample.
-    // Feed the final multiplier from ui_in (IF) and uio_in (local reference).
-    // For now supply q=floor(product/16), range -1016..+1024:
-    // ui_in=q[7:0], uio_in[3:0]=q[11:8]. Restore four discarded low bits
-    // as zeros; the FIR's initial >>> 4 recovers q exactly.
-    // assign mixer_sample = {uio_in[3:0], ui_in, 4'b0000};
-    // END TEMPORARY INPUT ADAPTER
 
     // Mixer
     
-    assign mixer_sample = $signed(if_sample) * $signed(sine_reference) ;
+    assign mixer_sample = if_sample * sine_reference;
 
     // FIR filter
 
@@ -60,15 +46,6 @@ module tt_um_angela_ethan_digitalradio (
         .mixer_sample(mixer_sample),
         .fir_sum(fir_sum)
     );
-
-    // BEGIN TEMPORARY OUTPUT ADAPTER
-    // TODO: Remove this assignment when fir_sum feeds audio scaling/PWM.
-    // Connect that module's PWM output to uo_out[0], zero unused output pins,
-    // and update the project-level test. No FIR instance changes are needed.
-    // For now uio_in[4] selects low byte (0) or sign-extended high byte (1).
-    // Read both pages between sample edges; there is no snapshot register.
-    // Keeping both pages observable prevents removal of unused FIR bits.
-    // END TEMPORARY OUTPUT ADAPTER
 
     // DC removal
 
@@ -98,21 +75,13 @@ module tt_um_angela_ethan_digitalradio (
     
 
     
-    wire [7:0] fir_high_byte = { {2{fir_sum[13]}}, fir_sum[13:8] };
-
-    // Decode hardware modes directly; X detection belongs in the testbench.
-    assign uo_out = (uio_in[7:4] == 4'h2) ? sine_reference :
-                    (uio_in[7:4] == 4'h3) ? (uio_in[0] ? mixer_sample[15:8] : mixer_sample[7:0]) :
-                    (uio_in[7:4] == 4'h4) ? (uio_in[4] ? fir_high_byte : fir_sum[7:0]) :
-                    (uio_in[7:4] == 4'h5) ? dc_removed_audio[7:0] :
-                    (uio_in[7:4] == 4'h6) ? limited_audio[7:0] :
-                    (uio_in[7:4] == 4'h8) ? {7'b0, pwm_out} : 
-                    8'h00;
+    // PWM is always available; no hardware debug selector is required.
+    assign uo_out = {7'b0, pwm_out};
 
     assign uio_out = 8'b0;
     assign uio_oe  = 8'b0;  
 
-    wire _unused = &{ena, uio_in[3:1], uio_in[7:5], 1'b0};
+    wire _unused = &{ena, uio_in, 1'b0};
 endmodule
 
 `default_nettype wire
