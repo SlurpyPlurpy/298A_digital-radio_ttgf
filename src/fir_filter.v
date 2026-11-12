@@ -20,9 +20,12 @@ module fir_filter (
     wire signed [14:0] stage1_sum;
     wire signed [10:0] stage2_input;
 
-    // Operands are signed before shifting. Narrow only after the shift.
-    assign stage1_input = mixer_sample >>> 4;
-    assign stage2_input = stage1_sum >>> 4;
+    // Explicitly discard four fractional bits (equivalent to signed >>> 4).
+    // Assignment to signed wires preserves negative two's-complement values.
+    assign stage1_input = mixer_sample[15:4];
+    assign stage2_input = stage1_sum[14:4];
+
+    wire _unused = &{mixer_sample[3:0], stage1_sum[3:0], 1'b0};
 
     fir_filter_sum11 #(.INPUT_WIDTH(12), .SUM_WIDTH(15)) u_stage1 (
         .clk(clk), .rst_n(rst_n), .sample_en(sample_en),
