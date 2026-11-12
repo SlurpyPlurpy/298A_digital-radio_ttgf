@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 @cocotb.test()
 async def test_nco_455khz(dut):
 
-    CLK_FREQ = 20_000_000
-    CLK_PERIOD = 50
+    CLK_FREQ = 1_000_000
+    CLK_PERIOD = 1000
     EXPECTED_FREQ = 455_000
     NUM_SAMPLES = 2000
 
@@ -27,7 +27,7 @@ async def test_nco_455khz(dut):
     for _ in range(NUM_SAMPLES):
 
         dut.clk.value = 1
-        await Timer(25, unit="ns")
+        await Timer(500, unit="ns")
 
         raw = int(dut.uo_out.value)
         value = raw - 256 if raw & 128 else raw
@@ -35,7 +35,7 @@ async def test_nco_455khz(dut):
         waveform.append(value)
 
         dut.clk.value = 0
-        await Timer(25, unit="ns")
+        await Timer(500, unit="ns")
 
     # Detect positive zero crossings
     crossings = []
