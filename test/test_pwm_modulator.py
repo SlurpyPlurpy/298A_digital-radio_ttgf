@@ -3,47 +3,49 @@ from cocotb.triggers import Timer
 
 @cocotb.test()
 async def test_pwm_modulator_comprehensive(dut):
-    """Comprehensive PWM duty-cycle verification."""
-    
+    """RTL-only: buffered PWM timing from the actual limiter output."""
     dut.clk.value = 0
-    dut.rst_n.value = 0
-    dut.ena.value = 1
-    dut.uio_in.value = 0x80
-    dut.ui_in.value = 0
-    await Timer(100, unit="ns")
-    
     dut.rst_n.value = 1
-    for _ in range(3):
-        dut.clk.value = 1
-        await Timer(25, unit="ns")
-        dut.clk.value = 0
-        await Timer(25, unit="ns")
+    dut.ena.value = 1
+    dut.ui_in.value = 0
+    dut.uio_in.value = 0
+    await Timer(10, unit="ns")
+    dut.rst_n.value = 0
+    await Timer(100, unit="ns")
+    dut.rst_n.value = 1
 
-    async def measure_duty_cycle(audio_level, sample_cycles=64):
-        dut.ui_in.value = audio_level & 0xff
-        dut.uio_in.value = 0x80
+    counter = 0
+    active_duty = pending_duty = 16
+    async def measure_duty_cycle(adc_sample, sample_cycles=64):
+        nonlocal counter, active_duty, pending_duty
         high_count = 0
-        
-        for _ in range(sample_cycles):
-            dut.clk.value = 1
-            await Timer(25, unit="ns")
-            if (int(dut.uo_out.value) & 0x01) == 1:
-                high_count += 1
+        for i in range(sample_cycles):
             dut.clk.value = 0
-            await Timer(25, unit="ns")
-            
+            dut.ui_in.value = adc_sample & 0xff
+            dut.uio_in.value = i & 0xff  # Unused inputs cannot select outputs.
+            await Timer(500, unit="ns")
+            audio = int(dut.user_project.limited_audio.value)
+            if audio & 512:
+                audio -= 1024
+            expected = int(counter < active_duty)
+            if counter == 31:
+                active_duty = pending_duty
+            counter = (counter + 1) % 32
+            pending_duty = audio // 32 + 16
+            dut.clk.value = 1
+            await Timer(500, unit="ns")
+            # Check the physical output, including the seven tied-low bits.
+            assert int(dut.uo_out.value) == expected
+            high_count += expected
         return high_count / sample_cycles
 
-    # Test case 1: Low audio level duty cycle
-    duty_low = await measure_duty_cycle(16)
-    
-    # Test case 2: Mid audio level duty cycle
-    duty_mid = await measure_duty_cycle(128)
-    
-    # Test case 3: High audio level duty cycle
-    duty_high = await measure_duty_cycle(240)
+    # Test case 1: Zero audio produces exactly 50% duty.
+    assert await measure_duty_cycle(0) == 0.5
 
+    # Test cases 2/3: Signed ADC extremes through the connected receiver.
+    # ADC amplitude alone does not determine duty monotonically after mixing.
+    duty_low = await measure_duty_cycle(-128, 256)
+    duty_high = await measure_duty_cycle(127, 256)
     assert 0.0 <= duty_low <= 1.0
-    assert 0.0 <= duty_mid <= 1.0
     assert 0.0 <= duty_high <= 1.0
-    assert duty_low <= duty_mid <= duty_high, "PWM duty cycle not monotonic"
+    assert int(dut.uio_out.value) == int(dut.uio_oe.value) == 0
