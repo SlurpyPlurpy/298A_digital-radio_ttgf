@@ -24,11 +24,13 @@ module tt_um_angela_ethan_digitalradio (
     wire signed [7:0] sine_reference; // 8-bit local oscillator output of reference wave
     wire signed [13:0] dc_removed_audio;
     wire signed [9:0] limited_audio;
+    wire signed [7:0] if_sample = $signed(ui_in);
     wire              pwm_out;
 
-    // NCO
-    wire [7:0] tuning_word = ui_in;
 
+    // NCO
+    wire [23:0] tuning_word = 24'd7633633;  // no longer having an input to select the channel since we are assuming a clean 455kHz incoming signal
+                                            // tuning word = 455000 * 2^24 / 1000000 = 7633633 approx
     nco_sine_gen u_nco (
         .clk(clk),
         .rst_n(rst_n),
@@ -47,7 +49,7 @@ module tt_um_angela_ethan_digitalradio (
 
     // Mixer
     
-    assign mixer_sample = $signed({1'b0, ui_in}) * sine_reference;
+    assign mixer_sample = $signed(if_sample) * $signed(sine_reference) ;
 
     // FIR filter
 
