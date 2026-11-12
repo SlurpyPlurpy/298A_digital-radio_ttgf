@@ -3,23 +3,22 @@
 module nco_sine_gen (
     input  wire               clk,
     input  wire               rst_n,
-    input  wire [7:0]         tuning_word,  // Controls the frequency step size
+    input  wire [23:0]         tuning_word,  // no frequency control, only need the 455kHz to match assumed incoming signal frequency
     output reg signed [7:0]   sine_reference
 );
 
-    // 8-bit Phase Accumulator
-    reg [7:0] phase_acc;
+    reg [23:0] phase_acc;
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            phase_acc <= 8'd0;
+            phase_acc <= 24'd0;
         end else begin
             phase_acc <= phase_acc + tuning_word;
         end
     end
 
     // Use the top 6 bits of the accumulator as the 64-entry ROM address (0 to 63)
-    wire [5:0] lut_addr = phase_acc[7:2];
+    wire [5:0] lut_addr = phase_acc[23:18];
 
     reg signed [7:0] sine_wave_rom;
     
