@@ -23,12 +23,17 @@ async def test_fir_wrapper(dut):
 
     async def check_output(expected):
         raw = int(dut.user_project.fir_sum.value)
-        actual = raw - 16384 if raw & 8192 else raw
+
+        # Decode the signed 14-bit FIR output
+        actual = raw - 16384 if raw & 8192 else raw   
         assert actual == expected, f"FIR: got {actual}, expected {expected}"
+        
+        # Assert that bidirectional pins are disabled and output is zero
         assert int(dut.uio_oe.value) == 0
         assert int(dut.uio_out.value) == 0
 
     async def reset():
+        """Hold clk and inputs low, and reset all hardware"""
         nonlocal h1, h2, previous_sum1
         dut.clk.value = 0
         dut.rst_n.value = 0
@@ -41,13 +46,21 @@ async def test_fir_wrapper(dut):
         previous_sum1 = 0
 
     async def sample(adc_sample):
+        """Pass a simulated ADC sample to the input ui_in"""
         nonlocal h1, h2, previous_sum1
+
+        # Hold clk low and pass the adc sample (give time for input to settle)
         dut.clk.value = 0
         dut.ui_in.value = adc_sample & 0xff
         await Timer(500, unit="ns")
+
         # The FIR sees the mixer value BEFORE this rising edge.
         raw = int(dut.user_project.mixer_sample.value)
+
+        # Decode the signed 16-bit mixer output
         product = raw - 65536 if raw & 32768 else raw
+
+        # Update both 11-sample moving sums using the previous stage 1 sum for stage 2
         h2 = [previous_sum1 // 16] + h2[:10]
         h1 = [product // 16] + h1[:10]
         previous_sum1 = sum(h1)
@@ -57,25 +70,32 @@ async def test_fir_wrapper(dut):
         await check_output(expected)
         return expected
 
+    # Input Scenarios ---
+
+    # Reset, then feed 30 zeroes and verify zero output
     await reset()
     for _ in range(30):
         assert await sample(0) == 0
+
     # A one-sample ADC impulse followed by a full filter flush.
     await sample(127)
     for _ in range(24):
         result = await sample(0)
     assert result == 0
 
-    # The NCO keeps running: constant ADC samples do not mean constant products.
+    # Check the FIR with held ADC values while the NCO keeps changing the mixer product
     for adc_sample in [127, -128, -1]:
         for _ in range(40):
             await sample(adc_sample)
 
+    # Test 1000 random samples with a reset halfway through
     rng = random.Random(298)
     for i in range(1000):
         if i == 500:
             await reset()
         await sample(rng.randrange(-128, 128))
+
+    # # Reset, then feed zeros to check that no old samples affect the output
     await reset()
     for _ in range(25):
         assert await sample(0) == 0
