@@ -53,24 +53,39 @@ module fir_filter_sum11 #(
     input  wire signed [INPUT_WIDTH-1:0] sample_in,
     output reg  signed [SUM_WIDTH-1:0]   sum_out
 );
+    // History needs no reset: mask its outgoing sample until all entries
+    // have been overwritten by samples accepted since the latest reset.
     reg signed [INPUT_WIDTH-1:0] history [0:10];
+    reg [3:0] fill_count;
+    wire history_full = (fill_count == 4'd11);
     wire signed [SUM_WIDTH-1:0] entering_sample;
     wire signed [SUM_WIDTH-1:0] leaving_sample;
     wire signed [SUM_WIDTH-1:0] sum_without_oldest;
     integer i;
 
     assign entering_sample = {{(SUM_WIDTH-INPUT_WIDTH){sample_in[INPUT_WIDTH-1]}}, sample_in};
-    assign leaving_sample = {{(SUM_WIDTH-INPUT_WIDTH){history[10][INPUT_WIDTH-1]}}, history[10]};
+    assign leaving_sample = history_full
+        ? {{(SUM_WIDTH-INPUT_WIDTH){history[10][INPUT_WIDTH-1]}}, history[10]}
+        : {SUM_WIDTH{1'b0}};
     // Subtract first: the intermediate is the sum of ten retained entries.
     assign sum_without_oldest = sum_out - leaving_sample;
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             sum_out <= {SUM_WIDTH{1'b0}};
-            for (i = 0; i < 11; i = i + 1)
-                history[i] <= {INPUT_WIDTH{1'b0}};
+            fill_count <= 4'd0;
         end else if (sample_en) begin
             sum_out <= sum_without_oldest + entering_sample;
+            // Saturate at eleven; the 12th accepted sample removes the first.
+            if (!history_full)
+                fill_count <= fill_count + 4'd1;
+        end
+    end
+
+    // Plain flip-flops: shifting during reset is harmless because fill_count
+    // remains zero. Only samples accepted after reset make history valid.
+    always @(posedge clk) begin
+        if (sample_en) begin
             history[0] <= sample_in;
             for (i = 1; i < 11; i = i + 1)
                 history[i] <= history[i-1];
