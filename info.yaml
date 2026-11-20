@@ -18,6 +18,7 @@ project:
   # Don't forget to also update `PROJECT_SOURCES` in test/Makefile.
   source_files:
     - "project.v"
+    - "mixer_multiplier.v"
     - "fir_filter.v"
     - "nco_sine_gen.v"
     - "dc_removal.v"
