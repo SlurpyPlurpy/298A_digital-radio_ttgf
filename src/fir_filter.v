@@ -6,8 +6,9 @@
 // This bound lets stage 1 store (mixer_sample >>> 4) in 11 signed bits.
 // Arbitrary signed 8x8 products are not supported (e.g. +16384).
 // Tie sample_en high for one sample per clock at the nominal 1 MHz.
-// Each >>> 4 rounds toward negative infinity; no division by 11 is used.
-// fir_sum is raw signed output, with nominal DC scale 121/256.
+// Stage 1 shifts by 4 and stage 2 by 5; both round toward negative infinity.
+// No division by 11 is used.
+// fir_sum is raw signed output, with nominal DC scale 121/512.
 // Accepted edge 0 updates stage 1 while stage 2 consumes its reset sum.
 // After accepted edge n+1, fir_sum equals mathematical FIR sample n.
 // Thus the 10-sample filter group delay has one extra pipeline interval.
@@ -20,29 +21,32 @@ module fir_filter (
 );
     wire signed [10:0] stage1_input;
     wire signed [14:0] stage1_sum;
-    wire signed [10:0] stage2_input;
+    wire signed [9:0] stage2_input;
+    wire signed [12:0] stage2_sum;
 
-    // Explicitly discard four fractional bits (equivalent to signed >>> 4).
+    // Discard four low bits before stage 1 and five before stage 2.
     // Assignment to signed wires preserves negative two's-complement values.
     // Bit 15 duplicates bit 14 throughout the supported mixer range.
     assign stage1_input = mixer_sample[14:4];
-    assign stage2_input = stage1_sum[14:4];
+    assign stage2_input = stage1_sum[14:5];
+    // Preserve the 14-bit interface by sign-extending the 13-bit sum.
+    assign fir_sum = {stage2_sum[12], stage2_sum};
 
-    wire _unused = &{mixer_sample[15], mixer_sample[3:0], stage1_sum[3:0], 1'b0};
+    wire _unused = &{mixer_sample[15], mixer_sample[3:0], stage1_sum[4:0], 1'b0};
 
     fir_filter_sum11 #(.INPUT_WIDTH(11), .SUM_WIDTH(15)) u_stage1 (
         .clk(clk), .rst_n(rst_n), .sample_en(sample_en),
         .sample_in(stage1_input), .sum_out(stage1_sum)
     );
 
-    fir_filter_sum11 #(.INPUT_WIDTH(11), .SUM_WIDTH(14)) u_stage2 (
+    fir_filter_sum11 #(.INPUT_WIDTH(10), .SUM_WIDTH(13)) u_stage2 (
         .clk(clk), .rst_n(rst_n), .sample_en(sample_en),
-        .sample_in(stage2_input), .sum_out(fir_sum)
+        .sample_in(stage2_input), .sum_out(stage2_sum)
     );
 endmodule
 
 // SUM_WIDTH must cover eleven samples over the caller's supported range.
-// The two instances use 242 history bits and 29 accumulator bits total.
+// The two instances use 231 history bits and 28 accumulator bits total.
 module fir_filter_sum11 #(
     parameter INPUT_WIDTH = 12,
     parameter SUM_WIDTH = 15

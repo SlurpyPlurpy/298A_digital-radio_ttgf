@@ -61,7 +61,7 @@ async def test_fir_wrapper(dut):
         product = raw - 65536 if raw & 32768 else raw
 
         # Update both 11-sample moving sums using the previous stage 1 sum for stage 2
-        h2 = [previous_sum1 // 16] + h2[:10]
+        h2 = [previous_sum1 // 32] + h2[:10]
         h1 = [product // 16] + h1[:10]
         previous_sum1 = sum(h1)
         expected = sum(h2)
