@@ -9,9 +9,10 @@
 // Stage 1 shifts by 5 and stage 2 by 4; both round toward negative infinity.
 // No division by 11 is used.
 // fir_sum is raw signed output, with nominal DC scale 121/512.
-// Accepted edge 0 updates stage 1 while stage 2 consumes its reset sum.
-// After accepted edge n+1, fir_sum equals mathematical FIR sample n.
-// Thus the 10-sample filter group delay has one extra pipeline interval.
+// Accepted edge 0 captures the shifted mixer sample in an input register.
+// Stage 1 consumes it on edge 1; stage 2 consumes that sum on edge 2.
+// After accepted edge n+2, fir_sum equals mathematical FIR sample n.
+// Thus the 10-sample filter group delay has two extra pipeline intervals.
 module fir_filter (
     input  wire               clk,
     input  wire               rst_n,
@@ -19,7 +20,7 @@ module fir_filter (
     input  wire signed [15:0] mixer_sample,
     output wire signed [13:0] fir_sum
 );
-    wire signed [9:0] stage1_input;
+    reg  signed [9:0] stage1_input;
     wire signed [13:0] stage1_sum;
     wire signed [9:0] stage2_input;
     wire signed [12:0] stage2_sum;
@@ -27,7 +28,14 @@ module fir_filter (
     // Discard five low bits before stage 1 and four before stage 2.
     // Assignment to signed wires preserves negative two's-complement values.
     // Bit 15 duplicates bit 14 throughout the supported mixer range.
-    assign stage1_input = mixer_sample[14:5];
+    // Break the lookup/multiplier-to-accumulator path after truncation.
+    // Reset inserts one zero sample; pauses hold the entire FIR pipeline.
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n)
+            stage1_input <= 10'sd0;
+        else if (sample_en)
+            stage1_input <= mixer_sample[14:5];
+    end
     assign stage2_input = stage1_sum[13:4];
     // Preserve the 14-bit interface by sign-extending the 13-bit sum.
     assign fir_sum = {stage2_sum[12], stage2_sum};
@@ -47,6 +55,7 @@ endmodule
 
 // SUM_WIDTH must cover eleven samples over the caller's supported range.
 // The two instances use 220 history bits and 27 accumulator bits total.
+// The wrapper adds a separate 10-bit input pipeline register.
 module fir_filter_sum11 #(
     parameter INPUT_WIDTH = 12,
     parameter SUM_WIDTH = 15
