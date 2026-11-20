@@ -35,13 +35,7 @@ module tt_um_angela_ethan_digitalradio (
 
     // Mixer
     
-    // Two smaller products are registered before their final addition.
-    // Adds one clock of latency; the ADC and NCO are sampled together.
-    mixer_multiplier u_mixer (
-        .clk(clk), .rst_n(rst_n),
-        .sample_a(if_sample), .sample_b(sine_reference),
-        .product(mixer_sample)
-    );
+    assign mixer_sample = if_sample * sine_reference;
 
     // FIR filter
 
