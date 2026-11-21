@@ -35,21 +35,7 @@ module tt_um_angela_ethan_digitalradio (
 
     // Mixer
     
-    // Separate the sine lookup from multiplication. Capture both operands
-    // together to preserve the ADC/NCO pairing, accepting one pair per clock.
-    // Adds one clock of latency ahead of the existing FIR input register.
-    reg signed [7:0] mixer_if_reg;
-    reg signed [7:0] mixer_sine_reg;
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            mixer_if_reg <= 8'sd0;
-            mixer_sine_reg <= 8'sd0;
-        end else begin
-            mixer_if_reg <= if_sample;
-            mixer_sine_reg <= sine_reference;
-        end
-    end
-    assign mixer_sample = mixer_if_reg * mixer_sine_reg;
+    assign mixer_sample = if_sample * sine_reference;
 
     // FIR filter
 
