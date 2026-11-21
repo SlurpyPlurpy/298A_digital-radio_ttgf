@@ -25,18 +25,6 @@ module fir_filter (
     wire signed [9:0] stage2_input;
     wire signed [12:0] stage2_sum;
 
-    // Both histories shift on the same accepted edges, including the initial
-    // pipeline zeros. Their validity therefore uses one shared fill counter.
-    reg [3:0] fill_count;
-    wire history_full = (fill_count == 4'd11);
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n)
-            fill_count <= 4'd0;
-        else if (sample_en && !history_full)
-            // The 12th accepted sample is the first to subtract old history.
-            fill_count <= fill_count + 4'd1;
-    end
-
     // Discard five low bits before stage 1 and four before stage 2.
     // Assignment to signed wires preserves negative two's-complement values.
     // Bit 15 duplicates bit 14 throughout the supported mixer range.
@@ -56,19 +44,18 @@ module fir_filter (
 
     fir_filter_sum11 #(.INPUT_WIDTH(10), .SUM_WIDTH(14)) u_stage1 (
         .clk(clk), .rst_n(rst_n), .sample_en(sample_en),
-        .history_full(history_full), .sample_in(stage1_input), .sum_out(stage1_sum)
+        .sample_in(stage1_input), .sum_out(stage1_sum)
     );
 
     fir_filter_sum11 #(.INPUT_WIDTH(10), .SUM_WIDTH(13)) u_stage2 (
         .clk(clk), .rst_n(rst_n), .sample_en(sample_en),
-        .history_full(history_full), .sample_in(stage2_input), .sum_out(stage2_sum)
+        .sample_in(stage2_input), .sum_out(stage2_sum)
     );
 endmodule
 
 // SUM_WIDTH must cover eleven samples over the caller's supported range.
 // The two instances use 220 history bits and 27 accumulator bits total.
-// The wrapper adds a 10-bit input pipeline register and shared 4-bit fill counter.
-// history_full must stay low until eleven samples have been accepted after reset.
+// The wrapper adds a separate 10-bit input pipeline register.
 module fir_filter_sum11 #(
     parameter INPUT_WIDTH = 12,
     parameter SUM_WIDTH = 15
@@ -76,13 +63,14 @@ module fir_filter_sum11 #(
     input  wire                          clk,
     input  wire                          rst_n,
     input  wire                          sample_en,
-    input  wire                          history_full,
     input  wire signed [INPUT_WIDTH-1:0] sample_in,
     output reg  signed [SUM_WIDTH-1:0]   sum_out
 );
     // History needs no reset: mask its outgoing sample until all entries
     // have been overwritten by samples accepted since the latest reset.
     reg signed [INPUT_WIDTH-1:0] history [0:10];
+    reg [3:0] fill_count;
+    wire history_full = (fill_count == 4'd11);
     wire signed [SUM_WIDTH-1:0] entering_sample;
     wire signed [SUM_WIDTH-1:0] leaving_sample;
     wire signed [SUM_WIDTH-1:0] sum_without_oldest;
@@ -98,13 +86,17 @@ module fir_filter_sum11 #(
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             sum_out <= {SUM_WIDTH{1'b0}};
+            fill_count <= 4'd0;
         end else if (sample_en) begin
             sum_out <= sum_without_oldest + entering_sample;
+            // Saturate at eleven; the 12th accepted sample removes the first.
+            if (!history_full)
+                fill_count <= fill_count + 4'd1;
         end
     end
 
-    // Plain flip-flops: shifting during reset is harmless because history_full
-    // remains low. Only samples accepted after reset make history valid.
+    // Plain flip-flops: shifting during reset is harmless because fill_count
+    // remains zero. Only samples accepted after reset make history valid.
     always @(posedge clk) begin
         if (sample_en) begin
             history[0] <= sample_in;
