@@ -11,6 +11,7 @@ async def test_fir_wrapper(dut):
     h1 = [0] * 11
     h2 = [0] * 11
     previous_sum1 = 0
+    input_pipeline = 0
     dut.clk.value = 0
     dut.rst_n.value = 1
     dut.ena.value = 1
@@ -34,7 +35,7 @@ async def test_fir_wrapper(dut):
 
     async def reset():
         """Hold clk and inputs low, and reset all hardware"""
-        nonlocal h1, h2, previous_sum1
+        nonlocal h1, h2, previous_sum1, input_pipeline
         dut.clk.value = 0
         dut.rst_n.value = 0
         dut.ui_in.value = 0
@@ -44,10 +45,11 @@ async def test_fir_wrapper(dut):
         dut.rst_n.value = 1
         h1, h2 = [0] * 11, [0] * 11
         previous_sum1 = 0
+        input_pipeline = 0
 
     async def sample(adc_sample):
         """Pass a simulated ADC sample to the input ui_in"""
-        nonlocal h1, h2, previous_sum1
+        nonlocal h1, h2, previous_sum1, input_pipeline
 
         # Hold clk low and pass the adc sample (give time for input to settle)
         dut.clk.value = 0
@@ -60,9 +62,11 @@ async def test_fir_wrapper(dut):
         # Decode the signed 16-bit mixer output
         product = raw - 65536 if raw & 32768 else raw
 
-        # Update both 11-sample moving sums using the previous stage 1 sum for stage 2
-        h2 = [previous_sum1 // 32] + h2[:10]
-        h1 = [product // 16] + h1[:10]
+        # Stage 1 consumes the previous registered product; stage 2 the previous sum.
+        # 5/4 truncation rounds down, including negative values.
+        h2 = [previous_sum1 // 16] + h2[:10]
+        h1 = [input_pipeline] + h1[:10]
+        input_pipeline = product // 32
         previous_sum1 = sum(h1)
         expected = sum(h2)
         dut.clk.value = 1
