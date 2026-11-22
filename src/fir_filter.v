@@ -3,12 +3,12 @@
 // Full-rate, two-stage 11-sample moving-sum FIR (no decimation).
 // mixer_sample must be the product of a signed 8-bit ADC sample and
 // the current NCO reference (-124 to +124): -15872 through +15872.
-// This bound lets stage 1 store (mixer_sample >>> 5) in 10 signed bits.
+// This bound lets stage 1 store (mixer_sample >>> 6) in 9 signed bits.
 // Arbitrary signed 8x8 products are not supported (e.g. +16384).
 // Tie sample_en high for one sample per clock at the nominal 1 MHz.
-// Stage 1 shifts by 5 and stage 2 by 4; both round toward negative infinity.
+// Stage 1 shifts by 6 and stage 2 by 4; both round toward negative infinity.
 // No division by 11 is used.
-// fir_sum is raw signed output, with nominal DC scale 121/512.
+// fir_sum is raw signed output, with nominal DC scale 121/1024.
 // Accepted edge 0 captures the shifted mixer sample in an input register.
 // Stage 1 consumes it on edge 1; stage 2 consumes that sum on edge 2.
 // After accepted edge n+2, fir_sum equals mathematical FIR sample n.
@@ -20,42 +20,44 @@ module fir_filter (
     input  wire signed [15:0] mixer_sample,
     output wire signed [13:0] fir_sum
 );
-    reg  signed [9:0] stage1_input;
-    wire signed [13:0] stage1_sum;
-    wire signed [9:0] stage2_input;
-    wire signed [12:0] stage2_sum;
+    reg  signed [8:0] stage1_input;
+    wire signed [12:0] stage1_sum;
+    // Supported ranges: stage1 input +/-248, sum +/-2728;
+    // stage2 input -171..170, sum -1881..1870.
+    wire signed [8:0] stage2_input;
+    wire signed [11:0] stage2_sum;
 
-    // Discard five low bits before stage 1 and four before stage 2.
+    // Discard six low bits before stage 1 and four before stage 2.
     // Assignment to signed wires preserves negative two's-complement values.
     // Bit 15 duplicates bit 14 throughout the supported mixer range.
     // Break the lookup/multiplier-to-accumulator path after truncation.
     // Reset inserts one zero sample; pauses hold the entire FIR pipeline.
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n)
-            stage1_input <= 10'sd0;
+            stage1_input <= 9'sd0;
         else if (sample_en)
-            stage1_input <= mixer_sample[14:5];
+            stage1_input <= mixer_sample[14:6];
     end
-    assign stage2_input = stage1_sum[13:4];
-    // Preserve the 14-bit interface by sign-extending the 13-bit sum.
-    assign fir_sum = {stage2_sum[12], stage2_sum};
+    assign stage2_input = stage1_sum[12:4];
+    // Preserve the 14-bit interface by sign-extending the 12-bit sum.
+    assign fir_sum = {{2{stage2_sum[11]}}, stage2_sum};
 
-    wire _unused = &{mixer_sample[15], mixer_sample[4:0], stage1_sum[3:0], 1'b0};
+    wire _unused = &{mixer_sample[15], mixer_sample[5:0], stage1_sum[3:0], 1'b0};
 
-    fir_filter_sum11 #(.INPUT_WIDTH(10), .SUM_WIDTH(14)) u_stage1 (
+    fir_filter_sum11 #(.INPUT_WIDTH(9), .SUM_WIDTH(13)) u_stage1 (
         .clk(clk), .rst_n(rst_n), .sample_en(sample_en),
         .sample_in(stage1_input), .sum_out(stage1_sum)
     );
 
-    fir_filter_sum11 #(.INPUT_WIDTH(10), .SUM_WIDTH(13)) u_stage2 (
+    fir_filter_sum11 #(.INPUT_WIDTH(9), .SUM_WIDTH(12)) u_stage2 (
         .clk(clk), .rst_n(rst_n), .sample_en(sample_en),
         .sample_in(stage2_input), .sum_out(stage2_sum)
     );
 endmodule
 
 // SUM_WIDTH must cover eleven samples over the caller's supported range.
-// The two instances use 220 history bits and 27 accumulator bits total.
-// The wrapper adds a separate 10-bit input pipeline register.
+// The two instances use 198 history bits and 25 accumulator bits total.
+// The wrapper adds a separate 9-bit input pipeline register.
 module fir_filter_sum11 #(
     parameter INPUT_WIDTH = 12,
     parameter SUM_WIDTH = 15
