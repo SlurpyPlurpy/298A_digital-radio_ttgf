@@ -5,9 +5,8 @@ module scaling_limiter (
     output reg  signed [9:0]  audio_out   // Clamped 10-bit signed range (-512 to +511)
 );
 
-    // The 6/4 FIR halves the nominal output versus 5/4. Divide by two
-    // instead of four to preserve nominal end-to-end gain; rounding differs.
-    wire signed [13:0] scaled_audio = audio_in >>> 1;
+    // Apply a fixed shift/gain to fit the range based on modulation depth
+    wire signed [13:0] scaled_audio = audio_in >>> 2;
 
     always @(*) begin
       // limit to prevent distortion from any overflow wraparound (cut off any larger audios to be within the max range)
