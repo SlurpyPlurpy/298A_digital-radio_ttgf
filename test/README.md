@@ -1,47 +1,36 @@
-# Sample testbench for a Tiny Tapeout project
+# Digital radio verification
 
-This is a sample testbench for a Tiny Tapeout project. It uses [cocotb](https://docs.cocotb.org/en/stable/) to drive the DUT and check the outputs.
-See below to get started or for more information, check the [website](https://tinytapeout.com/hdl/testing/).
+The design runs at 1 MHz (1,000 ns per clock), with two 11-sample FIR stages,
+5/4 truncation, one FIR input register, eleven DC fractional bits, and a
+limiter that divides by four. Keep the reference models aligned with any
+future intentional changes to these choices.
 
-## Setting up
+## RTL tests
 
-1. Edit [Makefile](Makefile) and modify `PROJECT_SOURCES` to point to your Verilog files.
-2. Edit [tb.v](tb.v) and replace `tt_um_example` with your module name.
+Run `make` in this directory. This simulates the Verilog source. Six module
+tests inspect internal signals; `test_radio` additionally checks the complete
+radio using only its external pins. The FIR model includes its input pipeline.
 
-## How to run
+## Gate-level tests
 
-To run the RTL simulation:
+Tiny Tapeout's `gl_test` job automatically runs `GATES=yes make`. The Makefile
+then selects only `test_radio`: synthesized circuits can flatten or rename
+the internal modules/signals used by the RTL tests. No workflow edits or
+manual switching are required. The gate-level test is not skipped.
 
-```sh
-make -B
-```
+To run locally, install the matching GF180 PDK, set PDK_ROOT, and place the
+generated powered submission netlist at `test/gate_level_netlist.v`. Then run
+`make GATES=yes`. The CI action supplies the PDK and netlist automatically.
 
-To run gatelevel simulation, first harden your project and copy `../runs/wokwi/results/final/verilog/gl/{your_module_name}.v` to `gate_level_netlist.v`.
+## External-output reference
 
-Then run:
+`radio_model.py` independently calculates the fixed NCO table, mixer, direct
+11-sample window sums, fixed-width DC tracking, limiter and buffered PWM.
+`test_radio.py` compares every settled output sample against that model at
+1 MHz. It covers silence, extreme/random ADC values, AM signals at 10% and
+50% modulation, both limiter bounds, unused pins, and repeated resets.
+It never reads internal DUT signals. The same test also runs on RTL.
 
-```sh
-make -B GATES=yes
-```
-
-If you wish to save the waveform in VCD format instead of FST format, edit tb.v to use `$dumpfile("tb.vcd");` and then run:
-
-```sh
-make -B FST=
-```
-
-This will generate `tb.vcd` instead of `tb.fst`.
-
-## How to view the waveform file
-
-Using GTKWave
-
-```sh
-gtkwave tb.fst tb.gtkw
-```
-
-Using Surfer
-
-```sh
-surfer tb.fst
-```
+This functional simulation does not replace routed static timing analysis
+or audio-quality measurements. Existing NCO/mixer tests save waveform PNGs;
+the testbench saves an FST waveform for GTKWave or Surfer.

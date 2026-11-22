@@ -40,7 +40,13 @@ VERILOG_SOURCES += $(PWD)/tb.v
 TOPLEVEL = tb
 
 # List test modules to run, separated by commas and without the .py suffix:
-COCOTB_TEST_MODULES = test_nco,test_multiplier,test_fir,test_dc_removal,test_scaling_limiter,test_pwm_modulator
+# Tiny Tapeout invokes GATES=yes for its gate-level job.
+# Internal signal names are stable only in RTL, not synthesized netlists.
+ifeq ($(GATES),yes)
+COCOTB_TEST_MODULES = test_radio
+else
+COCOTB_TEST_MODULES = test_nco,test_multiplier,test_fir,test_dc_removal,test_scaling_limiter,test_pwm_modulator,test_radio
+endif
 
 # include cocotb's make rules to take care of the simulator setup
 include $(shell cocotb-config --makefiles)/Makefile.sim
