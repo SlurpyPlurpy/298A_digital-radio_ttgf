@@ -14,7 +14,11 @@ async def test_scaling_limiter_comprehensive(dut):
     await Timer(100, unit="ns")
     dut.rst_n.value = 1
 
+    positive_clipping = False
+    negative_clipping = False
+
     async def evaluate_limiter(val_in):
+        nonlocal positive_clipping, negative_clipping
         dut.clk.value = 0
         dut.ui_in.value = val_in & 0xff
         await Timer(500, unit="ns")
@@ -25,7 +29,10 @@ async def test_scaling_limiter_comprehensive(dut):
             audio -= 16384
         raw = int(dut.user_project.limited_audio.value)
         actual = raw - 1024 if raw & 512 else raw
-        expected = max(-512, min(511, audio // 4))
+        scaled = audio // 4
+        positive_clipping |= scaled > 511
+        negative_clipping |= scaled < -512
+        expected = max(-512, min(511, scaled))
         assert actual == expected, f"Limiter: got {actual}, expected {expected}"
         return actual
 
@@ -34,7 +41,7 @@ async def test_scaling_limiter_comprehensive(dut):
     for _ in range(40):
         await evaluate_limiter(50)
 
-    # Test case 2: Strong aligned/opposite-sign carriers exercise both limits.
+    # Test case 2: Aligned/opposite-sign sine carriers check realistic inputs.
     observed = set()
     for sign in [1, -1]:
         for _ in range(200):
@@ -42,5 +49,17 @@ async def test_scaling_limiter_comprehensive(dut):
             if reference & 128:
                 reference -= 256
             observed.add(await evaluate_limiter(sign * reference))
+    # Test case 3: Full-scale square carriers stress both clipping branches.
+    # The extra FIR shift lowers gain, so the sine stimulus above alone no
+    # longer guarantees positive clipping. All ADC inputs remain in range.
+    for sign in [1, -1]:
+        for _ in range(200):
+            reference = int(dut.user_project.sine_reference.value)
+            if reference & 128:
+                reference -= 256
+            carrier = 127 if reference >= 0 else -127
+            observed.add(await evaluate_limiter(sign * carrier))
+    assert positive_clipping, "Positive clipping branch was not exercised"
+    assert negative_clipping, "Negative clipping branch was not exercised"
     assert 511 in observed, "Positive clipping was not exercised"
     assert -512 in observed, "Negative clipping was not exercised"
